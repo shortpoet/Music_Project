@@ -1,12 +1,24 @@
-# Import Splinter and BeautifulSoup
-from splinter import Browser
-from bs4 import BeautifulSoup as bs
 import pandas as pd
 import pymongo
 from pprint import pprint
 from datetime import datetime
 import re
 import os
+
+import pymongo
+from bson.json_util import dumps, loads
+from bson.objectid import ObjectId
+
+from splinter import Browser
+from bs4 import BeautifulSoup as bs
+from selenium import webdriver
+from selenium.webdriver.support.ui import Select
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait # available since 2.4.0
+from selenium.webdriver.support import expected_conditions as EC # available since 2.26.0
+from selenium.common.exceptions import TimeoutException
+
 
 script_start = datetime.now()
 
@@ -31,8 +43,9 @@ def dateFixer(str):
         date_list.append(date)
         return date_list
 
-executable_path = {'executable_path': '/Users/soria/Anaconda3/Scripts/chromedriver'}
-browser = Browser('chrome', **executable_path)
+# executable_path = {'executable_path': '/Users/soria/Anaconda3/Scripts/chromedriver'}
+# executable_path = {'executable_path': '/Users/soria/Anaconda3/Scripts/chromedriver'}
+# browser = Browser('chrome', **executable_path)
 
 conn = 'mongodb://localhost:27017'
 client = pymongo.MongoClient(conn)
@@ -49,14 +62,22 @@ if collection.find_one():
 else:
 
     # Get genres of each program and write to dictionary, match character cases
-    cacheFilePath = "./../../music_project_caches/_schedule_genre.txt"
+    # cacheFilePath = "./../../music_project_caches/_schedule_genre.txt"
+    cacheFilePath = "./../../Caches/music_project_caches/_schedule_genre.txt"
     if os.path.isfile(cacheFilePath):
         with open(cacheFilePath, encoding='utf-8') as cacheFile:
             html = cacheFile.read()
     else:
-        browser.visit('http://kdhx.org/shows/schedule')
-        browser.is_element_present_by_css("p.plhead", wait_time=1)
-        html = browser.html
+        url = 'http://kdhx.org/shows/schedule'
+        driver = webdriver.Chrome()
+        driver.get(url)
+        html = driver.page_source
+        try:
+            element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "show-schedule"))
+            )
+        finally:
+            driver.quit()          
         with open(cacheFilePath, "w", encoding='utf-8') as cacheFile:
             cacheFile.write(html)
 
@@ -84,6 +105,7 @@ else:
                 kdhx_genres[program].setdefault(countStr, {})
                 kdhx_genres[program][countStr] = element.get_text()
 
+    kdhx_genres['RSVP'] = kdhx_genres.pop('R.S.V.P.')
     kdhx_genres['No Time To Tarry Here'] = kdhx_genres.pop('No Time to Tarry Here')
     kdhx_genres['Music from the Hills'] = kdhx_genres.pop('Music From the Hills')
     kdhx_genres['Boogie On Down'] = kdhx_genres.pop('Boogie on Down')
@@ -95,15 +117,24 @@ else:
     collection.insert_one(kdhx_genres)
     # code to get playlists
 
-    cacheFilePath = "./../../music_project_caches/_schedule_playlist.txt"
+    # cacheFilePath = "./../../music_project_caches/_schedule_playlist.txt"
+    cacheFilePath = "./../../Caches/music_project_caches/_schedule_playlist.txt"
+
     if os.path.isfile(cacheFilePath):
         with open(cacheFilePath, encoding='utf-8') as cacheFile:
             html = cacheFile.read()
     else:
-        url = "https://spinitron.com/radio/playlist.php?station=kdhx&show=schedule&sv=l#here"
-        browser.is_element_present_by_css("p.plhead", wait_time=1)
-        browser.visit(url)
-        html = browser.html
+        url = "https://spinitron.com/KDHX/calendar#here"
+        driver = webdriver.Chrome()
+        driver.get(url)
+        html = driver.page_source
+        # try:
+        #     element = WebDriverWait(driver, 10).until(
+        #         EC.presence_of_element_located((By.ID, "calendar-w0"))
+        #     )
+        # finally:
+            # driver.quit()          
+        html = driver.page_source
         with open(cacheFilePath, "w", encoding='utf-8') as cacheFile:
             cacheFile.write(html)
 
@@ -127,14 +158,15 @@ else:
     #     print(program_url)
         name = re.sub( r'[\s]', '_', program_names[index])
         name = re.sub( r'[?]', '', name)
-        cacheFilePath = f"./../../music_project_caches/_playlists_{name}.txt"
+        cacheFilePath = f"./../../Caches/music_project_caches/_playsists_{name}.txt"
+        # cacheFilePath = f"./../../music_project_caches/_playlists_{name}.txt"
         if os.path.isfile(cacheFilePath):
             with open(cacheFilePath, encoding='utf-8') as cacheFile:
                 html = cacheFile.read()
         else:
-            browser.visit(program_url)
-            browser.is_element_present_by_css("p.plhead", wait_time=1)
-            html = browser.html
+            driver = webdriver.Chrome()
+            driver.get(program_url)
+            html = driver.page_source
             with open(cacheFilePath, "w", encoding='utf-8') as cacheFile:
                 cacheFile.write(html)
         program_soup = bs(html, 'html.parser')
@@ -196,14 +228,15 @@ for program in program_name_list[0:3]:
         begin_loop = datetime.now()
         loop_timer.append(begin_loop)
         name = re.sub(r'[\s]', '_', program)
-        cacheFilePath = f"./../../music_project_caches/{name}_{dict_index}.txt"
+        cacheFilePath = f"./../../Caches/music_project_caches/{name}_{dict_index}.txt"
+        # cacheFilePath = f"./../../music_project_caches/{name}_{dict_index}.txt"
         if os.path.isfile(cacheFilePath):
             with open(cacheFilePath, encoding='utf-8') as cacheFile:
                 html = cacheFile.read()
         else:
-            browser.visit(playlist_url)
-            browser.is_element_present_by_css("p.plhead", wait_time=1)
-            html = browser.html
+            driver = webdriver.Chrome()
+            driver.get(playlist_url)
+            html = driver.page_source
             with open(cacheFilePath, "w", encoding='utf-8') as cacheFile:
                 cacheFile.write(html)
         # print(f"{program} {dict_index} of {len(test_programs[program]['playlist(s)'])}: {playlist_url}")
@@ -405,7 +438,7 @@ for program in program_name_list[0:3]:
     print(f"Script End:{script_end}")
     print(f"Script Duration:{script_end - script_start}")
     print(f"Average Loop Time: {sum(averages)/len(averages)}")
-browser.quit()
+driver.quit()
 
 
 
